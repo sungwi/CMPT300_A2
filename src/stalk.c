@@ -168,10 +168,8 @@ void* sendMessages(void* arg) {
         return NULL;
     }
 
-    // Assuming you have a mechanism to fetch messages from the list
-    // Example: pseudo-code, you need to implement actual fetching
-    while (1) { // Replace with a proper condition to exit
-        char* message; // Assume you fetch this from the shared list
+    while (1) {
+        char* message; 
 
         pthread_mutex_lock(args->input_mutex);
         if (List_count(args->message_list) > 0) {
@@ -205,12 +203,15 @@ void* inputThread(void* arg) {
     char inputBuf[1024]; // Adjust size as necessary
 
     while (!shouldTerminate) {
-        if (fgets(inputBuf, sizeof(inputBuf), stdin) == NULL) {
-            // Handle error or EOF
+        //printf("Your turn: ");
+        char* keyInput = fgets(inputBuf, sizeof(inputBuf), stdin);
+        if (keyInput == NULL) {
+            perror("Input Error happens. Program Ends.");
             break;
         }
         if (strcmp(inputBuf, "!\n") == 0) {  // check if input is "!"
             shouldTerminate = 1; // Signal termination
+            printf("Ternimation Command [\"!\"] Found. Program Ends. \n");
             pthread_cond_broadcast(args->message_ready_cond); // Wake up any waiting threads
             break;
         }

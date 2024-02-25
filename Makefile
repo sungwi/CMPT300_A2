@@ -1,6 +1,4 @@
-# Makefile for compiling the 'stalk' program
-
-# Compiler settings - Can be customized.
+# Compiler settings 
 CC=gcc
 CFLAGS=-Iinclude -Wall
 LDFLAGS=-Llib -lpthread
@@ -12,9 +10,10 @@ OBJ=$(SRC_DIR)/stalk.o $(SRC_DIR)/thread.o $(LIB_DIR)/list.o
 
 # Executable name
 EXEC=stalk
+LINK_NAME=s-talk
+BIN_DIR=$(HOME)/bin
 
-# Default target
-all: $(EXEC) 
+all: $(EXEC) link
 
 $(EXEC): $(OBJ)
 	$(CC) $(OBJ) -o $@ $(LDFLAGS)
@@ -22,10 +21,14 @@ $(EXEC): $(OBJ)
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-.PHONY: clean install
+# Create a symbolic link named 's-talk' to the 'stalk' executable in ~/bin
+link:
+	@mkdir -p $(BIN_DIR)
+	@ln -sf $(PWD)/$(EXEC) $(BIN_DIR)/$(LINK_NAME)
+	@echo "Link created in $(BIN_DIR)/$(LINK_NAME)"
+
+.PHONY: clean
 
 clean:
 	rm -f $(SRC_DIR)/*.o $(EXEC)
-
-install:
-	@cp $(EXEC) /usr/local/bin/s-talk || echo "Installation failed. Try 'sudo make install' for system-wide installation."
+	rm -f $(BIN_DIR)/$(LINK_NAME)
