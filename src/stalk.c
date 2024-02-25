@@ -45,12 +45,6 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    // int numbytes;
-    // struct sockaddr_storage their_addr;
-    // char buf[MAXBUFLEN];
-    // socklen_t addr_len; 
-    // char s[INET6_ADDRSTRLEN];
-
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC; // either IPv4 or 6
     hints.ai_socktype = SOCK_DGRAM; // Datagram
@@ -215,7 +209,7 @@ void* inputThread(void* arg) {
             // Handle error or EOF
             break;
         }
-        if (strcmp(inputBuf, "!\n") == 0) {
+        if (strcmp(inputBuf, "!\n") == 0) {  // check if input is "!"
             shouldTerminate = 1; // Signal termination
             pthread_cond_broadcast(args->message_ready_cond); // Wake up any waiting threads
             break;
