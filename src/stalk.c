@@ -34,6 +34,9 @@ int main(int argc, char *argv[]){
     const char* myPort = argv[1];
     const char* remoteHostName = argv[2];
     const char* remotePort = argv[3];
+    printf("\nMy Port Number: %s\n", myPort);
+    printf("Remote Host Name: %s\n", remoteHostName);
+    printf("Remote Port Number: %s\n\n", remotePort);
 
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
