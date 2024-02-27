@@ -14,7 +14,8 @@
 #define MYPORT 1218 // the port users will be connecting to
 #define MAXBUFLEN 100
 
-static List *messageList;
+static List *sendList;
+static List *recList;
 static pthread_mutex_t listMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t messageReadyCond = PTHREAD_COND_INITIALIZER;
 
@@ -42,8 +43,9 @@ int main(int argc, char *argv[]){
     struct addrinfo hints, *servinfo, *p;
     int rv;
 
-    messageList = List_create();
-    if (messageList == NULL) { 
+    sendList = List_create();
+    recList = List_create();
+    if (sendList == NULL || recList == NULL) { 
         perror("Failed to create message List");
         exit(EXIT_FAILURE);
     }
@@ -51,7 +53,7 @@ int main(int argc, char *argv[]){
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC; // either IPv4 or 6
     hints.ai_socktype = SOCK_DGRAM; // Datagram
-    // hints.ai_flag = AI_PASSIVE; // use my IP
+    hints.ai_flag = AI_PASSIVE; // use my IP
 
     if ((rv = getaddrinfo(NULL, myPort, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
@@ -86,7 +88,8 @@ int main(int argc, char *argv[]){
     pthread_t recvThread, sendThread, inputThreadId, displayThreadId;
     thread_args_t commonArgs; // Assuming all threads can use a structure with common args
     commonArgs.socket_fd = sockfd;
-    commonArgs.message_list = messageList;
+    commonArgs.send_list = sendList;
+    commonArgs.rec_list = recList;
     commonArgs.input_mutex = &listMutex;
     commonArgs.message_ready_cond = &messageReadyCond;
     strncpy(commonArgs.remote_hostname, remoteHostName, sizeof(commonArgs.remote_hostname));
@@ -107,7 +110,8 @@ int main(int argc, char *argv[]){
     // Cleanup
     pthread_mutex_destroy(&listMutex);
     pthread_cond_destroy(&messageReadyCond);
-    List_free(messageList, free); // Assumes free is an appropriate deallocation function
+    List_free(sendList, free); 
+    List_free(recList, free);
 
     close(sockfd);
     return 0;
@@ -154,7 +158,7 @@ void* receiveMessages(void* arg) {
 
         // lock the mutex before accessing list
         pthread_mutex_lock(args->input_mutex);
-        List_append(args->message_list, strdup(buf)); // add message into list
+        List_append(args->rec_list, strdup(buf)); // add message into list
         pthread_cond_signal(args->message_ready_cond); 
         pthread_mutex_unlock(args->input_mutex);
     }
@@ -181,8 +185,8 @@ void* sendMessages(void* arg) {
         char* message; 
 
         pthread_mutex_lock(args->input_mutex);
-        if (List_count(args->message_list) > 0) {
-            message = (char*)List_trim(args->message_list);
+        if (List_count(args->send_list) > 0) {
+            message = (char*)List_trim(args->send_list);
         } else {
             pthread_cond_wait(args->message_ready_cond, args->input_mutex);
             pthread_mutex_unlock(args->input_mutex);
@@ -227,7 +231,7 @@ void* inputThread(void* arg) {
 
         // Lock mutex and add input to shared list
         pthread_mutex_lock(args->input_mutex);
-        List_append(args->message_list, strdup(inputBuf));
+        List_append(args->send_list, strdup(inputBuf));
         pthread_cond_signal(args->message_ready_cond);
         pthread_mutex_unlock(args->input_mutex);
     }
@@ -241,7 +245,7 @@ void* displayThread(void* arg) {
     while (!shouldTerminate) {
         pthread_mutex_lock(args->input_mutex);
         // Wait for a message to be available in the list
-        while (List_count(args->message_list) == 0 && !shouldTerminate) {
+        while (List_count(args->rec_list) == 0 && !shouldTerminate) {
             pthread_cond_wait(args->message_ready_cond, args->input_mutex);
         }
 
@@ -251,7 +255,7 @@ void* displayThread(void* arg) {
         }
 
         // Retrieve the message from the list
-        void* message = List_trim(args->message_list); // Assuming FIFO; adjust as needed
+        void* message = List_trim(args->rec_list); // Assuming FIFO; adjust as needed
 
         pthread_mutex_unlock(args->input_mutex);
 
