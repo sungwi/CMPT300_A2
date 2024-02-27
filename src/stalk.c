@@ -129,6 +129,7 @@ void* receiveMessages(void* arg) {
     struct sockaddr_storage their_addr;
     socklen_t addr_len;
     char s[INET6_ADDRSTRLEN];
+    int isFirstMessage = 1; // Flag to check if it's the first message received
 
     while (1) {
         addr_len = sizeof their_addr;
@@ -141,14 +142,19 @@ void* receiveMessages(void* arg) {
 
         buf[numbytes] = '\0'; // NULL-terminator
 
+        if (isFirstMessage) {
+            // Convert IP address to a string only for the first message
+            inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof s);
+            printf("You are connected with %s\n", s); // Print the sender's IP address only once
+            isFirstMessage = 0; // Reset the flag so this block won't execute again
+        }
+
         // lock the mutex before accessing list
         pthread_mutex_lock(args->input_mutex);
         List_append(args->message_list, strdup(buf)); // add message into list
         pthread_cond_signal(args->message_ready_cond); 
         pthread_mutex_unlock(args->input_mutex);
     }
-
-    
 
     return NULL;
 }
