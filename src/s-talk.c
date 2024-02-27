@@ -3,11 +3,15 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#define __USE_XOPEN2K
 #include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
+
 #include "../include/list.h"
 #include "../include/thread.h"
 
@@ -53,7 +57,7 @@ int main(int argc, char *argv[]){
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC; // either IPv4 or 6
     hints.ai_socktype = SOCK_DGRAM; // Datagram
-    hints.ai_flag = AI_PASSIVE; // use my IP
+    //hints.ai_flags = AI_PASSIVE; // use my IP
 
     if ((rv = getaddrinfo(NULL, myPort, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));

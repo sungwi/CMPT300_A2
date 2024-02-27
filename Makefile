@@ -6,10 +6,10 @@ LDFLAGS=-Llib -lpthread
 # Source and object files
 SRC_DIR=src
 LIB_DIR=lib
-OBJ=$(SRC_DIR)/stalk.o $(SRC_DIR)/thread.o $(LIB_DIR)/list.o
+OBJ=$(SRC_DIR)/s-talk.o $(SRC_DIR)/thread.o $(LIB_DIR)/list.o
 
 # Executable name
-EXEC=stalk
+EXEC=s-talk
 LINK_NAME=s-talk
 BIN_DIR=$(HOME)/bin
 
