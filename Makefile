@@ -6,7 +6,7 @@ LDFLAGS=-Llib -lpthread
 # Source and object files
 SRC_DIR=src
 LIB_DIR=lib
-OBJ=$(SRC_DIR)/s-talk.o $(SRC_DIR)/thread.o $(LIB_DIR)/list.o
+OBJ=$(SRC_DIR)/s-talk.o $(LIB_DIR)/list.o
 
 # Executable name
 EXEC=s-talk
@@ -21,11 +21,9 @@ $(EXEC): $(OBJ)
 $(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-# Create a symbolic link named 's-talk' to the 'stalk' executable in ~/bin
 link:
 	@mkdir -p $(BIN_DIR)
 	@ln -sf $(PWD)/$(EXEC) $(BIN_DIR)/$(LINK_NAME)
-	@echo "Link created in $(BIN_DIR)/$(LINK_NAME)"
 
 .PHONY: clean
 
