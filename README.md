@@ -2,7 +2,7 @@ Simon Fraser University, CMPT300 Assignment#2
 Name: Sungwi Kim
 ID: 301592065
 
-
+- I did alone; do not belong to any group. 
 - Everything works specified by the documentation.
 - (eg)Running Command is
 
