@@ -143,45 +143,28 @@ void* receiveAndDisplayMessages(void* arg) {
     socklen_t addr_len;
     
     while (!shouldTerminate) {
-        //pthread_mutex_lock(&recListMutex);
-        addr_len = sizeof their_addr;
-        int numbytes = recvfrom(args->socket_fd, buf, MAXBUFLEN-1 , 0, 
-                                (struct sockaddr*)&their_addr, &addr_len);
-        if (numbytes == -1) {
-            perror("recvfrom");
-            continue;
+            pthread_mutex_lock(args->recList_mutex);
+            // Wait for a signal if the list is empty
+            while (List_count(args->rec_list) == 0 && !shouldTerminate) {
+                pthread_cond_wait(args->message_ready_cond, args->recList_mutex);
+            }
+            if (shouldTerminate) {
+                pthread_mutex_unlock(args->recList_mutex);
+                break;
+            }
+
+            char* message = (char*)List_first(args->rec_list);
+            if (message != NULL) {
+                List_remove(args->rec_list); // Assuming this removes and returns the first item
+                pthread_mutex_unlock(args->recList_mutex);
+                printf("Received: %s\n", message);
+                free(message); // Free the message after displaying
+            } else {
+                pthread_mutex_unlock(args->recList_mutex);
+            }
         }
 
-        buf[numbytes] = '\0'; // NULL-terminator
-
-        pthread_mutex_lock(args->recList_mutex);
-        char* message = strdup(buf); // Duplicate the message to store in the list
-        if (message == NULL) {
-            perror("Failed to duplicate message for recList");
-            pthread_mutex_unlock(args->recList_mutex);
-            continue;
-        }
-
-        // Append the received message to the recList
-        if (List_append(args->rec_list, message) != 0) {
-            perror("Failed to append message to recList");
-            free(message); // Clean up duplicated message on failure
-        }
-
-        // Unlock the recList after modification
-        pthread_mutex_unlock(args->recList_mutex);
-
-        // Optionally, signal another thread that a message is ready
-        // if that thread is waiting on this condition
-        pthread_cond_signal(args->message_ready_cond);
-
-        
-        // Display the received message directly
-        printf("Received: %s\n", buf);
-        
-    }
-
-    return NULL;
+        return NULL;
 }
 
 void* inputAndSendMessages(void* arg) {
@@ -198,32 +181,31 @@ void* inputAndSendMessages(void* arg) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return NULL;
     }
-
     while (!shouldTerminate) {
-        char* keyInput = fgets(inputBuf, sizeof(inputBuf), stdin);
-        if (keyInput == NULL) {
-            perror("Input Error happens. Program Ends.");
-            break;
-        }
-        if (strcmp(inputBuf, "!\n") == 0) {
-            shouldTerminate = 1; // Signal termination
-            printf("Ternimation Command [\"!\"] Found. Program Ends. \n");
-            break;
-        }
-
-        // for (p = servinfo; p != NULL; p = p->ai_next) {
-        //     if ((rv = sendto(args->socket_fd, inputBuf, strlen(inputBuf), 0, p->ai_addr, p->ai_addrlen)) == -1) {
-        //         perror("talker: sendto");
-        //         continue;
-        //     }
-        //     break; // sent successfully
-        // }
         pthread_mutex_lock(args->sendList_mutex);
-        List_append(args->send_list, strdup(inputBuf));
-        pthread_mutex_unlock(args->sendList_mutex);
+        // Assuming List_first returns NULL if the list is empty
+        char* message = (char*)List_first(args->send_list);
+        if (message != NULL) {
+            List_remove(args->send_list); // Assuming this removes the first item
+            pthread_mutex_unlock(args->sendList_mutex);
+
+            // Iterate through all the results and send the message to the first we can
+            for (p = servinfo; p != NULL; p = p->ai_next) {
+                if (sendto(args->socket_fd, message, strlen(message), 0, p->ai_addr, p->ai_addrlen) == -1) {
+                    perror("talker: sendto");
+                    continue;
+                }
+                break; // Sent successfully
+            }
+            free(message); // Free the message after sending
+        } else {
+            pthread_mutex_unlock(args->sendList_mutex);
+            // If the list is empty, wait for a signal
+            pthread_cond_wait(args->message_ready_cond, args->sendList_mutex);
+        }
     }
 
-    //freeaddrinfo(servinfo);
+    freeaddrinfo(servinfo); // Ensure this is called to free network information
     return NULL;
 }
 
