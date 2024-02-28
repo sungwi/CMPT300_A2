@@ -1,3 +1,10 @@
+/*
+    Simon Fraser University, CMPT300 Assignment#2
+    Name: Sungwi Kim
+    ID: 301592065
+*/
+
+
 #ifndef THREAD_H
 #define THREAD_H
 
