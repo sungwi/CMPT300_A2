@@ -14,11 +14,13 @@
 #include "../include/list.h"
 #include "../include/thread.h"
 
-#define MAXBUFLEN 100
+#define MAXBUFLEN 256
 
 static List *sendList;
 static List *recList;
-static pthread_mutex_t listMutex = PTHREAD_MUTEX_INITIALIZER;
+//static pthread_mutex_t listMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t sendListMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t recListMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t messageReadyCond = PTHREAD_COND_INITIALIZER;
 
 void *get_in_addr(struct sockaddr *sa);
@@ -46,6 +48,7 @@ int main(int argc, char *argv[]){
     struct addrinfo hints, *servinfo, *p;
     int rv;
 
+    // define shared lists
     sendList = List_create();
     recList = List_create();
     if (sendList == NULL || recList == NULL) { 
@@ -93,7 +96,9 @@ int main(int argc, char *argv[]){
     commonArgs.socket_fd = sockfd;
     commonArgs.send_list = sendList;
     commonArgs.rec_list = recList;
-    commonArgs.input_mutex = &listMutex;
+    //commonArgs.input_mutex = &listMutex;
+    commonArgs.sendList_mutex = &sendListMutex;
+    commonArgs.recList_mutex = &recListMutex;
     commonArgs.message_ready_cond = &messageReadyCond;
     strncpy(commonArgs.remote_hostname, remoteHostName, sizeof(commonArgs.remote_hostname));
     strncpy(commonArgs.remote_port, remotePort, sizeof(commonArgs.remote_port));
@@ -107,7 +112,9 @@ int main(int argc, char *argv[]){
     pthread_join(sendThread, NULL);
 
     // Cleanup
-    pthread_mutex_destroy(&listMutex);
+    //pthread_mutex_destroy(&listMutex);
+    pthread_mutex_destroy(&sendListMutex);
+    pthread_mutex_destroy(&recListMutex);
     pthread_cond_destroy(&messageReadyCond);
     List_free(sendList, free); 
     List_free(recList, free);
@@ -117,7 +124,7 @@ int main(int argc, char *argv[]){
 
 }
 
- volatile int shouldTerminate = 0;
+volatile int shouldTerminate = 0;
 
 
 void *get_in_addr(struct sockaddr *sa)
@@ -136,6 +143,7 @@ void* receiveAndDisplayMessages(void* arg) {
     socklen_t addr_len;
     
     while (!shouldTerminate) {
+        //pthread_mutex_lock(&recListMutex);
         addr_len = sizeof their_addr;
         int numbytes = recvfrom(args->socket_fd, buf, MAXBUFLEN-1 , 0, 
                                 (struct sockaddr*)&their_addr, &addr_len);
@@ -146,8 +154,31 @@ void* receiveAndDisplayMessages(void* arg) {
 
         buf[numbytes] = '\0'; // NULL-terminator
 
+        pthread_mutex_lock(args->recList_mutex);
+        char* message = strdup(buf); // Duplicate the message to store in the list
+        if (message == NULL) {
+            perror("Failed to duplicate message for recList");
+            pthread_mutex_unlock(args->recList_mutex);
+            continue;
+        }
+
+        // Append the received message to the recList
+        if (List_append(args->rec_list, message) != 0) {
+            perror("Failed to append message to recList");
+            free(message); // Clean up duplicated message on failure
+        }
+
+        // Unlock the recList after modification
+        pthread_mutex_unlock(args->recList_mutex);
+
+        // Optionally, signal another thread that a message is ready
+        // if that thread is waiting on this condition
+        pthread_cond_signal(args->message_ready_cond);
+
+        
         // Display the received message directly
         printf("Received: %s\n", buf);
+        
     }
 
     return NULL;
@@ -180,16 +211,19 @@ void* inputAndSendMessages(void* arg) {
             break;
         }
 
-        for (p = servinfo; p != NULL; p = p->ai_next) {
-            if ((rv = sendto(args->socket_fd, inputBuf, strlen(inputBuf), 0, p->ai_addr, p->ai_addrlen)) == -1) {
-                perror("talker: sendto");
-                continue;
-            }
-            break; // sent successfully
-        }
+        // for (p = servinfo; p != NULL; p = p->ai_next) {
+        //     if ((rv = sendto(args->socket_fd, inputBuf, strlen(inputBuf), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+        //         perror("talker: sendto");
+        //         continue;
+        //     }
+        //     break; // sent successfully
+        // }
+        pthread_mutex_lock(args->sendList_mutex);
+        List_append(args->send_list, strdup(inputBuf));
+        pthread_mutex_unlock(args->sendList_mutex);
     }
 
-    freeaddrinfo(servinfo);
+    //freeaddrinfo(servinfo);
     return NULL;
 }
 
