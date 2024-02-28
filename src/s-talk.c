@@ -30,6 +30,8 @@ static pthread_mutex_t sendListMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t recListMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t messageReadyCond = PTHREAD_COND_INITIALIZER;
 
+pthread_t keyInputThr, udpOutputThr, udpInputThr,displayThr;
+
 void *get_in_addr(struct sockaddr *sa);
 void* keyboardInputThread(void* arg);
 void* udpOutputThread(void* arg);
@@ -98,7 +100,7 @@ int main(int argc, char *argv[]){
 
 
     // Initialize thread arguments
-    pthread_t keyInputThr, udpOutputThr, udpInputThr,displayThr;
+    // pthread_t keyInputThr, udpOutputThr, udpInputThr,displayThr;
     thread_args_t commonArgs; 
     commonArgs.socket_fd = sockfd;
     commonArgs.send_list = sendList;
@@ -154,6 +156,7 @@ void* keyboardInputThread(void* arg) {
         if (fgets(inputBuf, sizeof(inputBuf), stdin) == NULL) {
             continue;
         }
+
         pthread_mutex_lock(args->sendList_mutex);
         List_append(args->send_list, strdup(inputBuf));
         pthread_mutex_unlock(args->sendList_mutex);
@@ -192,8 +195,16 @@ void* udpOutputThread(void* arg) {
                 }
                 break; // sent successfully
             }
-            if(strcmp(message, "!\n") == 0){ // terminate program
-                printf("Ternimation Command [\"!\"] Implemented. Session Ends. \n");
+            if (strcmp(message, "!\n") == 0) {
+                pthread_cond_broadcast(args->message_ready_cond);
+                
+                pthread_cancel(keyInputThr);
+                pthread_cancel(udpOutputThr);
+                pthread_cancel(udpInputThr);
+                pthread_cancel(displayThr);
+                printf("Termination Command [\"!\"] Implemented. Session Ends.\n");
+                shouldTerminate = 1;
+                free(message); 
             }
             free(message); 
         } else {
@@ -246,6 +257,14 @@ void* screenOutputThread(void* arg) {
             if(strcmp(message, "!\n") == 0){ // terminate program
                 shouldTerminate = 1; // Signal termination
                 printf("Ternimation Command [\"!\"] Implemented by other client. Session Ends. \n");
+                
+                pthread_cond_broadcast(&messageReadyCond);
+
+                // Cancel each thread as an additional measure to ensure they stop
+                pthread_cancel(keyInputThr);
+                pthread_cancel(udpOutputThr);
+                pthread_cancel(udpInputThr);
+                pthread_cancel(displayThr);
             }
             else{
                 printf("Received: %s\n", message);
