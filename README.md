@@ -15,3 +15,10 @@ ID: 301592065
    Or
    "Ternimation Command ["!"] Implemented by other client. Session Ends." 
                                                             if other client terminates. 
+
+
+参考動画
+https://github.com/sungwi/CMPT300_A2/assets/98384565/599393b1-5ddd-4325-86ba-17e6cac453f6
+
+
+
