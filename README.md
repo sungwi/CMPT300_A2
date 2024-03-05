@@ -1,4 +1,4 @@
-Simon Fraser University, CMPT300 Assignment#2
+Simon Fraser University
 Name: Sungwi Kim
 ID: 301592065
 
